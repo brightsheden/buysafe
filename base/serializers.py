@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Profile, Balance,Order,Shipping
+from .models import Profile, Balance,Order,Shipping,Withdrawal
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -62,3 +62,22 @@ class ShippingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shipping
         fields = '__all__'
+
+
+
+
+class WithdrawalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Withdrawal
+        fields = ['id', 'profile', 'account_name', 'bank_name', 'amount', 'account_number', 'is_approved']
+        read_only_fields = ['id', 'profile']
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than zero.")
+        return value
+
+    def validate_is_approved(self, value):
+        if not isinstance(value, bool):
+            raise serializers.ValidationError("is_approved must be a boolean value.")
+        return value

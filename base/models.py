@@ -21,6 +21,7 @@ class Balance(models.Model):
     available_balance = models.DecimalField(max_digits=10, default=0.00, decimal_places=2, blank=True, null=True)
     pending_balance = models.DecimalField(max_digits=10, default=0.00,decimal_places=2, blank=True, null=True)
     payout = models.DecimalField(max_digits=10,default=0.00, decimal_places=2, blank=True, null=True)
+    pending_withdrawal = models.DecimalField(max_digits=10, default=0.00,decimal_places=2, blank=True, null=True)
     deposit = models.DecimalField(max_digits=10,default=0.00, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
@@ -73,4 +74,16 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=10,decimal_places=2)
     def __str__(self):
         return self.name
+    
 
+
+class Withdrawal(models.Model):
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    account_name = models.CharField(max_length=100)
+    bank_name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    account_number = models.CharField(max_length=20)
+    is_approved = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Withdrawal for {self.profile.name}"
