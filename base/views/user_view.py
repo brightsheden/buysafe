@@ -93,6 +93,9 @@ def submit_withdrawal(request):
         required_fields = ['amount', 'accountName', 'bankName', 'accountNumber']
         if not all(field in data for field in required_fields):
             return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.profile.balance.available_balance < Decimal(data['amount']):
+            return Response({'error': 'Insufficient balance'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Create a new Withdrawal instance
         withdrawal = Withdrawal(
@@ -127,7 +130,8 @@ def approve_withdrawal(request,pk):
     withdrawal = Withdrawal.objects.get(pk=pk)
     profile = profile.objects.get(id=withdrawal.profile)
     profile.pending_withdrawal  -= withdrawal.amount
-    profile.payout = withdrawal.amount
+    profile.payout += withdrawal.amount
+    profile.total_withdrawal += withdrawal.amount
     profile.save()
     withdrawal.is_approved = True
     withdrawal.save()
@@ -145,13 +149,19 @@ def get_user_withdrawals(request):
 class ApproveWithdrawalView(APIView):
     def post(self, request, pk):
         try:
-            withdrawal = Withdrawal.objects.get(pk=pk)
+            withdrawal = Withdrawal.objects.get(pk=pk)\
+            
+            if withdrawal.is_approved:
+                return Response({"message": "Withdrawal already approved"}, status=status.HTTP_400_BAD_REQUEST)
             
             # Update the profile's balance
-            profile = withdrawal.profile
-            profile.pending_withdrawal -= withdrawal.amount
+            profile = Profile.objects.get(id=withdrawal.profile.id)
+            profile = profile.balance
+            profile.pending_withdrawal  -= withdrawal.amount
             profile.payout += withdrawal.amount
+            
             profile.save()
+           
             
             # Update the withdrawal status
             withdrawal.is_approved = True
@@ -160,3 +170,71 @@ class ApproveWithdrawalView(APIView):
             return Response({"message": "Withdrawal approved"}, status=status.HTTP_200_OK)
         except Withdrawal.DoesNotExist:
             return Response({"error": "Withdrawal not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def getWallets(request):
+    wallet = Balance.objects.all()
+    serializer = BalanceSerializer(wallet, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def manual_transaction(request):
+    data = request.data
+    email = data.get("email")
+    type = data.get("type")
+    wallet_type = data.get("wallet_type")
+    amount = data.get("amount")
+    user = Profile.objects.get(email=email)
+
+    if wallet_type == 'balance' and type == 'deposit':
+        user.balance.available_balance += Decimal(amount)
+        Transaction.objects.create(
+            profile=user,
+            amount=amount,
+            type=type
+        )
+        user.save()
+        return Response({"message": "Transaction successful"}, status=status.HTTP_200_OK)
+    
+    
+
+    if wallet_type == 'balance' and type == 'debit':
+        if user.balance.available_balance < Decimal(amount):
+            return Response({"message": "Insufficient balance"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.balance.available_balance -= Decimal(amount)
+        user.balance.save()
+        Transaction.objects.create(
+            profile=user,
+            amount=amount,
+            type=type
+        )
+        return Response({"message": "Transaction successful"}, status=status.HTTP_200_OK)
+
+    if wallet_type == 'pending_balance' and type == 'debit':
+        if user.balance.pending_balance < Decimal(amount):
+            return Response({"message": "You can debit from pending balance"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.balance.pending_balance -= Decimal(amount)
+        user.balance.save()
+        Transaction.objects.create(
+            profile=user,
+            amount=amount,
+            type=type
+        )
+        return Response({"message": "Transaction successful"}, status=status.HTTP_200_OK)
+    
+    return Response({"message":"invalid transaction"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+    
+

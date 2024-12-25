@@ -23,6 +23,7 @@ class Balance(models.Model):
     payout = models.DecimalField(max_digits=10,default=0.00, decimal_places=2, blank=True, null=True)
     pending_withdrawal = models.DecimalField(max_digits=10, default=0.00,decimal_places=2, blank=True, null=True)
     deposit = models.DecimalField(max_digits=10,default=0.00, decimal_places=2, blank=True, null=True)
+    
 
     def __str__(self):
         return self.profile.name
